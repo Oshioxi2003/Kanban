@@ -1,5 +1,3 @@
-Dưới đây là mẫu `README.md` dành cho dự án ứng dụng web **Personal Kanban Life Planner** – trình bày rõ ràng, chuyên nghiệp, phù hợp với GitHub hoặc portfolio cá nhân:
-
 ---
 
 ```markdown
