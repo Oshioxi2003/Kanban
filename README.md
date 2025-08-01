@@ -1,4 +1,4 @@
----
+
 
 ```markdown
 # 🗓️ Personal Kanban Life Planner
@@ -7,7 +7,7 @@ A modern, intuitive web application that helps users organize tasks, goals, and 
 
 > 🎯 Designed for students, creators, professionals, and anyone who needs a flexible system to manage life and work visually.
 
----
+
 
 ## 🚀 Features
 
