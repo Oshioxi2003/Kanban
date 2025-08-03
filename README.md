@@ -1,8 +1,3 @@
-Dưới đây là mẫu `README.md` dành cho dự án ứng dụng web **Personal Kanban Life Planner** – trình bày rõ ràng, chuyên nghiệp, phù hợp với GitHub hoặc portfolio cá nhân:
-
----
-
-```markdown
 # 🗓️ Personal Kanban Life Planner
 
 A modern, intuitive web application that helps users organize tasks, goals, and personal routines using a drag-and-drop **Kanban board** combined with **calendar scheduling**.
