@@ -3,18 +3,18 @@ version: '3.8'
 services:
   mysql:
     image: mysql:8.0
-    container_name: kanban_mysql
+    container_name: kanban_mysql_prod
     restart: always
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - kanban_network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
@@ -22,14 +22,28 @@ services:
     env_file:
       - .env
 
+  redis:
+    image: redis:7-alpine
+    container_name: kanban_redis_prod
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - kanban_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: kanban_backend
+    container_name: kanban_backend_prod
     restart: always
     environment:
-      - DEBUG=${DEBUG}
+      - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
@@ -43,11 +57,13 @@ services:
       - GOOGLE_OAUTH2_CLIENT_ID=${GOOGLE_OAUTH2_CLIENT_ID}
       - GOOGLE_OAUTH2_CLIENT_SECRET=${GOOGLE_OAUTH2_CLIENT_SECRET}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-      - CORS_ALLOW_ALL_ORIGINS=${CORS_ALLOW_ALL_ORIGINS}
+      - CORS_ALLOW_ALL_ORIGINS=False
       - REDIS_URL=redis://redis:6379/0
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-    ports:
-      - "8000:8000"
+      - SECURE_SSL_REDIRECT=True
+      - SECURE_HSTS_SECONDS=31536000
+      - SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+      - SECURE_HSTS_PRELOAD=True
     volumes:
       - ./staticfiles:/app/staticfiles
       - ./media:/app/media
@@ -56,55 +72,52 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - kanban_network
     env_file:
       - .env
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 kanban_project.wsgi:application"
-
-  redis:
-    image: redis:7-alpine
-    container_name: kanban_redis
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+             gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 60 kanban_project.wsgi:application"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: kanban_frontend
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+        - VITE_APP_NAME=${VITE_APP_NAME}
+    container_name: kanban_frontend_prod
     restart: always
-    ports:
-      - "3000:3000"
     depends_on:
       - backend
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
-      - VITE_APP_NAME=${VITE_APP_NAME}
+    networks:
+      - kanban_network
     env_file:
       - .env
 
   nginx:
     image: nginx:alpine
-    container_name: kanban_nginx
+    container_name: kanban_nginx_prod
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./staticfiles:/staticfiles
+      - ./media:/media
+      - ./ssl:/etc/nginx/ssl  # For SSL certificates
     depends_on:
       - backend
       - frontend
+    networks:
+      - kanban_network
+
+networks:
+  kanban_network:
+    driver: bridge
 
 volumes:
   mysql_data:
